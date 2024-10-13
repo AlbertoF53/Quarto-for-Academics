@@ -1,0 +1,528 @@
+---
+title: "Teaching tidyverse in 2023"
+author: "Mine Cetinkaya-Rundel"
+format: 
+  html:
+    code-link: true
+    code-fold: true
+    self-contained: true
+    embed-resources: true
+    toc: true
+    theme: Zephyr
+    number-sections: true
+knirt:
+  opts_chunk: 
+    warning: false 
+    editor_options: 
+    chunk_output_type: inline
+editor: visual
+---
+
+## Teaching tidyverse by [Mine Centinkaya](https://www.youtube.com/watch?v=KsBBRHAgAhM)
+
+## Loading packages.
+
+```{r}
+#| label: load-packages
+
+library(tidyverse)
+library(palmerpenguins)
+library(gt)
+library(pkgload)
+
+```
+
+Native pipe
+
+```{r}
+#| label: pipe
+
+mpg %>% 
+  count(class)
+
+mtcars %>% 
+  summary()
+
+
+```
+
+## Nine core packages in tidyverse
+
+```{r}
+#| label: libridate
+
+library(tidyverse)
+library(lubridate)
+
+today_n <-  20230719
+
+class(today_n)
+ymd(today_n)
+class(ymd(today_n))
+
+
+today_t <- "7/19/2023"
+class(today_t)
+
+mdy(today_t)
+class(mdy(today_t))
+
+#making a more complicated data 
+
+today_s <-  "This video is being recorder on 19 July 2023 at 1 pm ET."
+class(today_s)
+
+
+#Parsing the date by identifying day, month year and hour & time zone
+
+dmy_h(today_s, tz = "America/New_York")
+
+class(dmy_h(today_s, tz = "America/New_York"))
+
+
+```
+
+## Conflict resolution in the tidyverse
+
+```{r}
+#| label: conflicts
+
+library(tidyverse)
+
+tidyverse_conflicts()
+
+
+
+```
+
+-   Base R conflict resolution:
+
+```{r}
+#| label: base-r-conflict-1
+#| error: true
+
+
+pkgload::unload("dplyr")
+penguins %>% 
+  filter(species == "Adelie")
+
+
+```
+
+## Conflict resolution with conflicted:
+
+```{r}
+#| label: base-r-conflict-2
+
+# Option 1: with ::
+
+penguins %>% 
+  dplyr::filter(species == "Adelie")
+
+library("dplyr")
+
+penguins %>% 
+  filter(species == "Adelie")
+
+#Option 2: with conflicts_prefer()
+
+#conflicts_prefer(dplyr::filter)
+
+penguins %>% 
+  filter(species == "Adelie")
+
+```
+
+## Improved and expanded \*\_join() functionality
+
+islands
+
+```{r}
+#| label: join-by
+
+#information on three islands
+
+islands <- tribble(
+  ~name, ~coordinates,
+  "Torgersen","64°46’S 64°5'W",
+  "Biscoe", "65°26’S 65°5'W",
+  "Dream", "64°44’S 64°14'W",
+)
+
+islands
+
+#Left join two options
+
+#Old option
+penguins %>% 
+  left_join(islands, by = c("island" = "name"))
+
+#New option
+penguins %>% 
+  left_join(islands, join_by(island == name)) %>% 
+  select(species, island, coordinates)
+
+#* Explanation: Take the penguins dataset, then left join it the island data frame by
+#* where island is equal to name 
+
+```
+
+## Many-to-many relationships
+
+```{r}
+#| label: join-many-to-many
+
+#Data on three penguins, one row per samp_id
+
+three_penguins <- tribble(
+  ~samp_id,  ~species,  ~island,
+  1, "Adelie", "Torgersen",
+  2, "Gentoo", "Biscoe",
+  3, "Chinstrap", "Dream"
+)
+
+three_penguins
+
+#* Data on weight measurements of these penguins, one row per sam_id,
+#* meas_id, combo
+
+weight_measurements <- tribble(
+  ~samp_id, ~meas_id, ~body_mass_g,
+  1, 1, 3220,
+  1, 2, 3250,
+  2, 1, 4730,
+  2, 2, 4725,
+  3, 1, 4000,
+  3, 2, 4050,)
+
+weight_measurements
+
+#* Data on flipper lenght measurement of these penguins, one row per samp_id,
+#* meass_id, mass_id_combo
+
+flipper_measurements <-  tribble(
+  ~samp_id, ~meas_id, ~flipper_length_mm,
+  1, 1, 193,
+  1, 2, 195,
+  2, 1, 214,
+  2, 2, 216,
+  3, 1, 203,
+  3, 2, 203)
+
+
+flipper_measurements
+
+
+#* one-to-many relationships
+#* 
+
+three_penguins %>% 
+  left_join(weight_measurements, join_by(samp_id))
+
+#Merging penguins with weight measurements
+penguins_weighted <- three_penguins %>% 
+  left_join(weight_measurements, join_by(samp_id))
+
+
+#* many-to-many relationships
+
+#Merging penguins with weight measurements
+three_pen_many <- three_penguins %>% 
+  left_join(weight_measurements, join_by(samp_id))
+
+
+#* many-to-many relationships
+
+weight_measurements %>% 
+  left_join(flipper_measurements, join_by(samp_id))
+
+#* To eliminate warning: Notice that meas.id is repeated and identified by source
+
+weight_measurements %>% 
+  left_join(flipper_measurements, join_by(samp_id), relationship = "many-to-many")
+
+
+#* Notice that meas.id is repeated and identified by source: meas_id.x and meas_id.y. 
+#* To eliminate this problem make a double match by samp_id and meas_id
+#* 
+
+weight_measurements %>% 
+  left_join(flipper_measurements, join_by(samp_id, meas_id))
+
+
+body_flipper <- weight_measurements %>% 
+  left_join(flipper_measurements, join_by(samp_id, meas_id))
+
+#Then merge this measurement data to penguins data (one to many)
+
+three_penguins %>% 
+  left_join(body_flipper, join_by(samp_id))
+
+penguins_measured <- three_penguins %>% 
+  left_join(body_flipper, join_by(samp_id))
+
+```
+
+## Handling unmatched cases:
+
+```{r}
+#|label: join-unmatched
+
+# data on four penguins, one row per samp_id
+
+four_penguins <- tribble(
+  ~samp_id, ~species, ~island,
+  1, "Adelie", "Torgersen",
+  2, "Gentoo", "Biscoe",
+  3, "Chinstrap", "Dream",
+  4, "Adelie", "Biscoe"
+)
+
+four_penguins
+
+#Unmatched rows
+
+weight_measurements %>% 
+  left_join(four_penguins, join_by(samp_id))
+
+
+#Option 1: with inner_join()
+
+weight_measurements %>% 
+  inner_join(four_penguins, join_by(samp_id))
+
+#* The 4th penguin is dropped from the new merged dataset
+
+#Option 2: with unmatched = drop
+weight_measurements %>% 
+  left_join(four_penguins, join_by(samp_id), unmatched = "drop")
+
+
+#Option 3: do nothing at your own risk
+weight_measurements %>% 
+  left_join(four_penguins, join_by(samp_id))
+
+#* Option 4: identify unmatched cases as error. Good starting place for the analysis
+#* before deciding to drop the cases
+
+
+#weight_measurements %>% 
+ # left_join(four_penguins, join_by(samp_id), unmatched = "error")
+
+```
+
+## Per operation grouping
+
+```{r}
+#| label: groups-message
+
+#*Typical tidyverse pipeline: plot mean body weights of penguings by species & sex
+#*
+
+penguins %>% 
+  drop_na(sex, body_mass_g) %>% 
+  group_by(species,sex) %>% 
+  summarise(mean_bw = mean(body_mass_g)) %>% 
+  ggplot(aes(x = species, y = mean_bw, fill = sex)) +
+           geom_col(position = "dodge")
+           
+```
+
+```{r}
+#|label: groups-downstream-effects
+
+
+#*Example 1: persistence grouping, downstream effects
+#*
+
+penguins %>% 
+  drop_na(sex, body_mass_g) %>% 
+  group_by(species,sex) %>% 
+  summarise(mean_bw = mean(body_mass_g)) %>% 
+  slice_head(n = 1)
+
+# Problems arise if you include .groups= "drop"
+
+penguins %>% 
+  drop_na(sex, body_mass_g) %>% 
+  group_by(species, sex) %>% 
+  summarise(mean_bw = mean(body_mass_g), .groups = "drop") %>% 
+  slice_head(n = 1)
+
+#Example 2: persistence grouping, downstream effects
+
+penguins %>% 
+  drop_na(sex, body_mass_g) %>% 
+  group_by(species, sex) %>% 
+  summarise(mean_bw = mean(body_mass_g)) %>% 
+  gt::gt()
+
+penguins %>% 
+  drop_na(sex, body_mass_g) %>% 
+  group_by(species, sex) %>% 
+  summarise(mean_bw = mean(body_mass_g), .groups = "drop") %>% 
+  gt::gt()
+
+#Option 1: with .groups = "drop"
+
+penguins %>% 
+  drop_na(sex, body_mass_g) %>% 
+  group_by(species, sex) %>% 
+  summarise(mean_bw = mean(body_mass_g),
+            .groups = "drop")
+
+#Option 2: with .by that reduces the need to group the data
+
+penguins %>% 
+  drop_na(sex, body_mass_g) %>% 
+  summarise(mean_bw = mean(body_mass_g),
+            .by = species)
+
+#To create grouping by gender add sex
+penguins %>% 
+  drop_na(sex, body_mass_g) %>% 
+  summarise(mean_bw = mean(body_mass_g),
+            .by = species,sex)
+
+penguins %>% 
+  drop_na(sex, body_mass_g) %>% 
+  summarise(
+    mean_bw = mean(body_mass_g),
+    .by = c(species, sex))
+
+
+```
+
+## Quality of life improvements to `case_when` and `if_else`
+
+-   New argument for `case_when()  -.default`
+
+```{r}
+#|label: case-when
+
+library(palmerpenguins)
+
+#* Penguin quintiles
+
+penguins %>% 
+  reframe(bm_cat = quantile(body_mass_g, c(0.25,0.75), na.rm = TRUE))
+
+#Or using summary
+
+summary(penguins$body_mass_g)
+
+
+#* Label penguins as Small, Medium, or Large based on quintile values
+
+penguins %>% 
+  mutate(bm_cat = case_when(
+    is.na(body_mass_g) ~ NA,
+    body_mass_g < 3550 ~ "Small",
+    body_mass_g > 3550 & body_mass_g < 4750 ~ "Medium",
+    body_mass_g > 4750 ~ "Large"
+  )) %>% 
+  relocate(body_mass_g, bm_cat, .after = island) %>% 
+  View()
+
+#Or
+
+penguins %>% 
+  mutate(bm_cat = case_when(
+    is.na(body_mass_g) ~ NA,
+    body_mass_g < 3550 ~ "Small",
+    between(body_mass_g, 3550, 4750) ~ "Medium",
+    TRUE ~ "Large"
+  )) %>% 
+  count(bm_cat)
+
+#To facilitate viewing use relocate to reoder the new variable
+
+penguins %>% 
+  mutate(bm_cat = case_when(
+    is.na(body_mass_g) ~ NA,
+    body_mass_g < 3550 ~ "Small",
+    between(body_mass_g, 3550, 4750) ~ "Medium",
+    TRUE ~ "Large"
+  )) %>% 
+  relocate(body_mass_g, bm_cat, .after = island) 
+
+
+
+```
+
+-   Better handling of NAs in `if_else`, `case_when`, and friends:
+
+```{r}
+#| label: if_else
+
+#Creating a character out of a numeric variable
+
+penguins %>% 
+  mutate(bm_unit = if_else(!is.na(body_mass_g), paste(body_mass_g, "g"),
+                           NA_character_)) %>% 
+  relocate(body_mass_g,bm_unit, .after = island)
+
+#Use this simplified option
+penguins %>% 
+  mutate(bm_unit = if_else(!is.na(body_mass_g), paste(body_mass_g, "g"),
+                           NA)) %>% 
+  relocate(body_mass_g,bm_unit, .after = island)
+
+
+```
+
+## New syntax for separating columns
+
+```{r}
+#| label: separate
+
+# Data on penguins, with text string descriptions
+
+three_penguins_descriptions <- tribble(
+  ~id, ~description,
+  1, "Species: Adelie, Island - Torgersen",
+  2, "Species: Gentoo, Island - Biscoe",
+  3, "Species: Chinstrop, Island - Dream",
+)
+
+three_penguins_descriptions
+
+#separate wider_delim()
+
+new_penguins <-  three_penguins_descriptions |> 
+  separate_wider_delim(
+    cols = description,
+    delim = ",",
+    names = c("species", "island")
+  )
+
+#But the new approach also brings too much repeated information
+
+# separate_wider_regex() -- if you are that sort of thing...
+# 
+# new_penguins_2 <- three_penguins_descriptions |> 
+#  separate_wider_regex(
+#    cols = description,
+#    patterns = c(
+#     "Species: ", species = "[^,]+",
+#     ",",
+#     "Island - ", island = ".*"
+#   )
+# )
+
+
+
+```
+
+## New arguments for the line geoms: `linewidth`
+
+```{r}
+#| label: linewidth
+
+penguins %>% 
+  drop_na() %>% 
+  ggplot(aes(x = flipper_length_mm, y = body_mass_g)) +
+  geom_smooth(linewidth = 2)
+  
+
+```
